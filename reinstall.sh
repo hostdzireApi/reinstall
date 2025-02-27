@@ -3985,24 +3985,14 @@ if is_need_grub_extlinux; then
         else
             error_and_exit "grub not found"
         fi
-    
-        # --- Rescue Mode workaround ---
-            echo "Rescue mode detected: current root is 'LiveOS_rootfs'."
-            echo "Creating temporary root structure for GRUB..."
-            mkdir -p /mnt/target_root/boot/grub2
-            # Bind-mount a jelenlegi rootot egy ideiglenes helyre
-            mount --bind / /mnt/target_root
-            cd /mnt/target_root
-            # Győződjünk meg róla, hogy a fő diszköt már fel tudtuk mérni:
-            find_main_disk
-            # Kényszerítsük, hogy GRUB a fő diszköt használja rootként
-            export GRUB_DEVICE="/dev/$xda"
-            # A GRUB konfigurációs célfájlt erre állítjuk:
-            grub_cfg="/mnt/target_root/boot/grub2/grub.cfg"
-    
-        # GRUB konfiguráció generálása (a módosított környezettel)
+
+        # nixos 手动执行 grub-mkconfig -o /boot/grub/grub.cfg 会丢失系统启动条目
+        # 正确的方法是修改 configuration.nix 的 boot.loader.grub.extraEntries
+        # 但是修改 configuration.nix 不是很好，因此改成修改 grub.cfg
         if [ -x /nix/var/nix/profiles/system/bin/switch-to-configuration ]; then
+            # 生成 grub.cfg
             /nix/var/nix/profiles/system/bin/switch-to-configuration boot
+            # 手动启用 41_custom
             nixos_grub_home="$(dirname "$(readlink -f "$(get_cmd_path grub-mkconfig)")")/.."
             $nixos_grub_home/etc/grub.d/41_custom >>$grub_cfg
         elif is_have_cmd update-grub; then
