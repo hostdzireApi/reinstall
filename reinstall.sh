@@ -2250,60 +2250,27 @@ find_main_disk() {
     fi
 
     if is_in_windows; then
-        # TODO:
-        # 已测试 vista
-        # 测试 软raid
-        # 测试 动态磁盘
-
-        # diskpart 命令结果
-        # 磁盘 ID: E5FDE61C
-        # 磁盘 ID: {92CF6564-9B2E-4348-A3BD-D84E3507EBD7}
+        # Windows ág: marad a korábbi logika
         main_disk=$(printf "%s\n%s" "select volume $c" "uniqueid disk" | diskpart |
-            tail -1 | awk '{print $NF}' | sed 's,[{}],,g')
+            tail -1 | awk '{print $NF}' | sed 's/[{}]//g')
     else
-        # centos7下测试     lsblk --inverse $mapper | grep -w disk     grub2-probe -t disk /
-        # 跨硬盘btrfs       只显示第一个硬盘                            显示两个硬盘
-        # 跨硬盘lvm         显示两个硬盘                                显示/dev/mapper/centos-root
-        # 跨硬盘软raid      显示两个硬盘                                显示/dev/md127
-
-        # 还有 findmnt
-
-        # 改成先检测 /boot/efi /efi /boot 分区？
-
         install_pkg lsblk
-        # 查找主硬盘时，优先查找 /boot 分区，再查找 / 分区
-        # lvm 显示的是 /dev/mapper/xxx-yyy，再用第二条命令得到sda
-        mapper=$(mount | awk '$3=="/boot" {print $1}' | grep . || mount | awk '$3=="/" {print $1}')
-        xda=$(lsblk -rn --inverse $mapper | grep -w disk | awk '{print $1}' | sort -u)
-
-        # 检测主硬盘是否横跨多个磁盘
-        os_across_disks_count=$(wc -l <<<"$xda")
-        if [ $os_across_disks_count -eq 1 ]; then
-            info "Main disk: $xda"
-        else
-            error_and_exit "OS across $os_across_disks_count disk: $xda"
+        # Az lsblk -dn -o NAME,TYPE parancs segítségével csak a "disk" típusú eszközöket listázzuk
+        selected_disk=$(lsblk -dn -o NAME,TYPE | awk '$2=="disk" {print $1; exit}')
+        if [ -z "$selected_disk" ]; then
+            error_and_exit "No valid disk found."
         fi
+        xda="$selected_disk"
+        info "Main disk: /dev/$xda"
 
-        # 可以用 dd 找出 guid?
-
-        # centos7 blkid lsblk 不显示 PTUUID
-        # centos7 sfdisk 不显示 Disk identifier
-        # alpine blkid 不显示 gpt 分区表的 PTUUID
-        # 因此用 fdisk
-
-        # Disk identifier: 0x36778223                                  # gnu fdisk + mbr
-        # Disk identifier: D6B17C1A-FA1E-40A1-BDCB-0278A3ED9CFC        # gnu fdisk + gpt
-        # Disk identifier (GUID): d6b17c1a-fa1e-40a1-bdcb-0278a3ed9cfc # busybox fdisk + gpt
-        # 不显示 Disk identifier                                        # busybox fdisk + mbr
-
-        # 获取 xda 的 id
         install_pkg fdisk
+        # Az fdisk kimenetéből kinyerjük a Disk identifier-t
         main_disk=$(fdisk -l /dev/$xda | grep 'Disk identifier' | awk '{print $NF}' | sed 's/0x//')
     fi
 
-    # 检查 id 格式是否正确
+    # Ellenőrizzük, hogy az azonosító érvényes formátumú-e
     if ! grep -Eix '[0-9a-f]{8}' <<<"$main_disk" &&
-        ! grep -Eix '[0-9a-f-]{36}' <<<"$main_disk"; then
+       ! grep -Eix '[0-9a-f-]{36}' <<<"$main_disk"; then
         error_and_exit "Disk ID is invalid: $main_disk"
     fi
 }
