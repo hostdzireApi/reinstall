@@ -4002,22 +4002,6 @@ if is_need_grub_extlinux; then
         fi
     fi
 
-        # nixos 手动执行 grub-mkconfig -o /boot/grub/grub.cfg 会丢失系统启动条目
-        # 正确的方法是修改 configuration.nix 的 boot.loader.grub.extraEntries
-        # 但是修改 configuration.nix 不是很好，因此改成修改 grub.cfg
-        if [ -x /nix/var/nix/profiles/system/bin/switch-to-configuration ]; then
-            # 生成 grub.cfg
-            /nix/var/nix/profiles/system/bin/switch-to-configuration boot
-            # 手动启用 41_custom
-            nixos_grub_home="$(dirname "$(readlink -f "$(get_cmd_path grub-mkconfig)")")/.."
-            $nixos_grub_home/etc/grub.d/41_custom >>$grub_cfg
-        elif is_have_cmd update-grub; then
-            update-grub
-        else
-            $grub-mkconfig -o $grub_cfg
-        fi
-    fi
-
     # 重新生成 extlinux.conf
     if is_use_local_extlinux; then
         if is_have_cmd update-extlinux; then
