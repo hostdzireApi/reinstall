@@ -3978,19 +3978,6 @@ if is_need_grub_extlinux; then
     # 并重新生成 grub.cfg
     # 因为有些机子例如hython debian的grub.cfg少了40_custom 41_custom
     if is_use_local_grub; then
-            # --- Rescue Mode workaround: temporary root structure for GRUB ---
-            if mount | grep -q "LiveOS_rootfs"; then
-                echo "Rescue mode detected: current root is 'LiveOS_rootfs'."
-                echo "Creating temporary root structure for GRUB..."
-                mkdir -p /mnt/target_root/boot/grub2
-                # Itt beállítjuk a GRUB konfigurációs célfájlt erre a helyre
-                grub_cfg="/mnt/target_root/boot/grub2/grub.cfg"
-                # Átváltunk az ideiglenes root könyvtárba, hogy a grub2-probe kanonikus útvonallal dolgozhasson
-                cd /mnt/target_root
-            fi
-            
-            # GRUB konfiguráció generálása (a módosított környezettel)
-            $grub-mkconfig -o $grub_cfg
         if is_have_cmd grub2-mkconfig; then
             grub=grub2
         elif is_have_cmd grub-mkconfig; then
@@ -3998,6 +3985,28 @@ if is_need_grub_extlinux; then
         else
             error_and_exit "grub not found"
         fi
+    
+        # --- Rescue Mode workaround: csak ha a root "LiveOS_rootfs" néven fut ---
+        if mount | grep -q "LiveOS_rootfs"; then
+            echo "Rescue mode detected: current root is 'LiveOS_rootfs'."
+            echo "Creating temporary root structure for GRUB..."
+            mkdir -p /mnt/target_root/boot/grub2
+            grub_cfg="/mnt/target_root/boot/grub2/grub.cfg"
+            cd /mnt/target_root
+        fi
+    
+        # GRUB konfiguráció generálása:
+        if [ -x /nix/var/nix/profiles/system/bin/switch-to-configuration ]; then
+            /nix/var/nix/profiles/system/bin/switch-to-configuration boot
+            nixos_grub_home="$(dirname "$(readlink -f "$(get_cmd_path grub-mkconfig)")")/.."
+            $nixos_grub_home/etc/grub.d/41_custom >>$grub_cfg
+        elif is_have_cmd update-grub; then
+            update-grub
+        else
+            $grub-mkconfig -o $grub_cfg
+        fi
+        …
+    fi
 
         # nixos 手动执行 grub-mkconfig -o /boot/grub/grub.cfg 会丢失系统启动条目
         # 正确的方法是修改 configuration.nix 的 boot.loader.grub.extraEntries
