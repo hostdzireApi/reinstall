@@ -3998,6 +3998,18 @@ if is_need_grub_extlinux; then
         elif is_have_cmd update-grub; then
             update-grub
         else
+            # --- Rescue Mode workaround: temporary root structure for GRUB ---
+            if mount | grep -q "LiveOS_rootfs"; then
+                echo "Rescue mode detected: current root is 'LiveOS_rootfs'."
+                echo "Creating temporary root structure for GRUB..."
+                mkdir -p /mnt/target_root/boot/grub2
+                # Itt beállítjuk a GRUB konfigurációs célfájlt erre a helyre
+                grub_cfg="/mnt/target_root/boot/grub2/grub.cfg"
+                # Átváltunk az ideiglenes root könyvtárba, hogy a grub2-probe kanonikus útvonallal dolgozhasson
+                cd /mnt/target_root
+            fi
+            
+            # GRUB konfiguráció generálása (a módosított környezettel)
             $grub-mkconfig -o $grub_cfg
         fi
     fi
